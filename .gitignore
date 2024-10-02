@@ -1,5 +1,6 @@
 FirstServer/
 build/
+output/
 .vscode/
 # Prerequisites
 *.d

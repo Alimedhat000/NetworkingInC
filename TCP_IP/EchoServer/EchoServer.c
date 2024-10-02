@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <limits.h>
 #include <pthread.h>
+#include <stdint.h>
 
 typedef struct sockaddr_in SA_IN; // redefining the names for easier
 typedef struct sockaddr SA;
@@ -20,7 +21,7 @@ typedef struct sockaddr SA;
 int check(int expressionStatus, char *msg);
 void *handle_connection(void *Client_Socket_P);
 
-int main(int argc, char const *argv[])
+int main()
 {
     int Server_socket, Client_Socket;
     SA_IN Server_addr, Client_addr;
@@ -57,7 +58,7 @@ int main(int argc, char const *argv[])
         printf("Connection Established!\n");
 
         // Handle the connection directly
-        handle_connection((void *)(intptr_t)Client_Socket); // Cast to void pointer
+        handle_connection((void *)(intptr_t)(Client_Socket)); // Cast to void pointer
     }
 
     return 0;
