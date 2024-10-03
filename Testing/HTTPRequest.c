@@ -2,8 +2,10 @@
 
 #include <string.h>
 #include <ctype.h>
+#include "./HashTables/HashTables.h"
 
 #define MAX_REQUEST_SIZE 8192
+#define HASH_TABLE_SIZE 100
 // We will use strtok() to tokenize the request
 // Please pray for my sanity 🤪
 
@@ -32,7 +34,7 @@
 // ==========================================================
 struct HTTPRequest HTTP_REQUEST_constructor(const char *request_buffer, size_t buffer_size)
 {
-    struct HTTPRequest httpRequest = {.method = 0, .URI = NULL, .version = 0, .headers = NULL, .body = NULL};
+    struct HTTPRequest httpRequest = {.method = 0, .URI = NULL, .version = 0, .headers_string = NULL, .body = NULL, .header_value = NULL};
 
     if (buffer_size > MAX_REQUEST_SIZE)
     {
@@ -69,7 +71,7 @@ struct HTTPRequest HTTP_REQUEST_constructor(const char *request_buffer, size_t b
         httpRequest.URI = strdup(URI);
         if (strncmp(version, "HTTP/", 5) == 0)
         {
-            httpRequest.version = atof(version + 5);
+            httpRequest.version = (float)atof(version + 5);
         }
     }
 
@@ -83,10 +85,41 @@ struct HTTPRequest HTTP_REQUEST_constructor(const char *request_buffer, size_t b
     }
 
     // Everything between the request line and the body (or end) is headers
-    httpRequest.headers = strdup(end_of_request_line + 2);
+    httpRequest.headers_string = strdup(end_of_request_line + 2);
+    char *header_tok = strdup(httpRequest.headers_string);
+
+    // Parse headers into hash table
+    httpRequest.header_value = createHashtable(HASH_TABLE_SIZE);
+    char *header_line = strtok(header_tok, "\r\n");
+    while (header_line)
+    {
+        char *colon = strchr(header_line, ':');
+        if (colon)
+        {
+            *colon = '\0';
+            char *key = trim(header_line);
+            char *value = trim(colon + 1);
+            add(httpRequest.header_value, key, value);
+        }
+        header_line = strtok(NULL, "\r\n");
+    }
 
     free(request);
     return httpRequest;
+}
+
+void HTTPRequest_destructor(struct HTTPRequest *request)
+{
+    if (request)
+    {
+        free(request->URI);
+        free(request->headers_string);
+        free(request->body);
+        if (request->header_value)
+        {
+            destroy(request->header_value);
+        }
+    }
 }
 
 enum HTTPMethods SetMethod(const char *method)
@@ -110,4 +143,49 @@ enum HTTPMethods SetMethod(const char *method)
     if (strcmp(method, "TRACE") == 0)
         return TRACE;
     return -1; // Invalid method
+}
+
+// Helper function to trim leading and trailing whitespace
+char *trim(char *str)
+{
+    while (isspace((unsigned char)*str))
+        str++;
+    if (*str == 0)
+        return str;
+    char *end = str + strlen(str) - 1;
+    while (end > str && isspace((unsigned char)*end))
+        end--;
+    end[1] = '\0';
+    return str;
+}
+
+void ParsingTester()
+{
+
+    const char test_request[] =
+        "GET /index.html HTTP/1.1\r\n"
+        "Host: www.example.com\r\n"
+        "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0\r\n"
+        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n"
+        "Accept-Language: en-US,en;q=0.5\r\n"
+        "Accept-Encoding: gzip, deflate, br\r\n"
+        "Connection: keep-alive\r\n"
+        "Upgrade-Insecure-Requests: 1\r\n"
+        "Cache-Control: max-age=0\r\n\r\n"
+        "This is the body of the request";
+
+    size_t request_length = strlen(test_request);
+
+    struct HTTPRequest request = HTTP_REQUEST_constructor(test_request, request_length);
+
+    // Print parsed information
+    printf("Method: %d\n", request.method);
+    printf("URI: %s\n", request.URI);
+    printf("Version: %.1f\n", request.version);
+    printf("Headers:\n%s\n", request.headers_string);
+    printf("Body:\n%s\n", request.body ? request.body : "No body");
+    printTable(request.header_value);
+
+    // // Don't forget to free the allocated memory
+    HTTPRequest_destructor(&request);
 }
